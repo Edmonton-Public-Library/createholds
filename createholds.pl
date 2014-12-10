@@ -44,11 +44,12 @@ $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
 
 my $WORKING_DIR= qq{.};
-my $HOLD_TRX   = "$WORKING_DIR/$0.trx";
-my $HOLD_RSP   = "$WORKING_DIR/$0.rsp";
-my $TMP        = "$WORKING_DIR/$0.tmp";
+my $HOLD_TRX   = "$WORKING_DIR/create_hold.trx";
+my $HOLD_RSP   = "$WORKING_DIR/create_hold.rsp";
+my $TMP        = "$WORKING_DIR/create_hold.tmp";
 my $HOLD_TYPE  = qq{C};
 my $PICKUP_LOCATION  = qq{EPLZORDER};
+my $SYSTEM_CARD= "";
 my $VERSION    = qq{0.1};
 
 #
@@ -73,9 +74,9 @@ to be affected.
 
 example: 
  $0 -x
- cat user_keys.lst | $0 -B 21221012345678 -U
- cat user_keys.lst | $0 -B 21221012345678 -tU
- cat item_keys.lst | $0
+ cat item_ids.lst | $0 -B 21221012345678 -U
+ cat item_ids.lst | $0 -B 21221012345678 -tU
+ cat item_ids.lst | $0
  
 Version: $VERSION
 EOF
@@ -90,7 +91,14 @@ sub init
     my $opt_string = 'B:l:tUx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
-    usage() if ( ! $opt{'B'} );
+    if ( $opt{'B'} )
+	{
+		$SYSTEM_CARD = $opt{'B'};
+	}
+	else
+	{
+		usage();
+	}
 	$HOLD_TYPE = qq{T} if ( $opt{'t'} );
 }
 
