@@ -69,7 +69,7 @@ to be affected.
  -B: REQUIRED User ID.
  -l: Sets the hold pickup location. Default $PICKUP_LOCATION.
  -t: Creates title level holds (create COPY level holds by default).
- -U: Actually places or removes holds. Default just produce transaction commands.
+ -U: Actually places holds. Default just produce transaction commands.
  -x: This (help) message.
 
 example: 
