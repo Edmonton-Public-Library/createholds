@@ -4,7 +4,7 @@ Project Notes
 -------------
 
 Instructions for Running:
-./createholds
+./createholds.pl -x for instructions.
 
 Product Description:
 Perl script written by Andrew Nisbet for Edmonton Public Library, distributable by the enclosed license.
@@ -13,7 +13,7 @@ Repository Information:
 This product is under version control using Git.
 
 Dependencies:
-None
+selitem, selcatalog, perl 5.6 and up.
 
 Known Issues:
 None
