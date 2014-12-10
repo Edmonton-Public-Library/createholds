@@ -1,12 +1,12 @@
-#!/s/sirsi/Unicorn/Bin/perl -w
+#!/usr/bin/perl -w
 ####################################################
 #
 # Perl source file for project createholds 
 # Purpose:
 # Method:
 #
-#<one line to give the program's name and a brief idea of what it does.>
-#    Copyright (C) 2013  Andrew Nisbet
+# Creates holds for an arbitrary but specified user.
+#    Copyright (C) 2014  Andrew Nisbet
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,7 +42,14 @@ use Getopt::Std;
 $ENV{'PATH'}  = qq{:/s/sirsi/Unicorn/Bincustom:/s/sirsi/Unicorn/Bin:/usr/bin:/usr/sbin};
 $ENV{'UPATH'} = qq{/s/sirsi/Unicorn/Config/upath};
 ###############################################
-my $VERSION    = qq{0.0};
+
+my $WORKING_DIR= qq{.};
+my $HOLD_TRX   = "$WORKING_DIR/$0.trx";
+my $HOLD_RSP   = "$WORKING_DIR/$0.rsp";
+my $TMP        = "$WORKING_DIR/$0.tmp";
+my $HOLD_TYPE  = qq{C};
+my $PICKUP_LOCATION  = qq{EPLZORDER};
+my $VERSION    = qq{0.1};
 
 #
 # Message about this program and how to use it.
@@ -51,12 +58,25 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-x]
-Usage notes for createholds.pl.
+	usage: $0 [-xUt] -B<barcode> [-l <library_code>]
+Creates holds for a user. The script expects a list of items on stdin
+which must have the barcode of the item; one per line.
 
+Use the '-B' switch will determine which user account is 
+to be affected.
+
+ -B: REQUIRED User ID.
+ -l: Sets the hold pickup location. Default $PICKUP_LOCATION.
+ -t: Creates title level holds (create COPY level holds by default).
+ -U: Actually places or removes holds. Default just produce transaction commands.
  -x: This (help) message.
 
-example: $0 -x
+example: 
+ $0 -x
+ cat user_keys.lst | $0 -B 21221012345678 -U
+ cat user_keys.lst | $0 -B 21221012345678 -tU
+ cat item_keys.lst | $0
+ 
 Version: $VERSION
 EOF
     exit;
@@ -67,11 +87,121 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'x';
+    my $opt_string = 'B:l:tUx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
+    usage() if ( ! $opt{'B'} );
+	$HOLD_TYPE = qq{T} if ( $opt{'t'} );
+}
+
+# Trim function to remove whitespace from the start and end of the string.
+# param:  string to trim.
+# return: string without leading or trailing spaces.
+sub trim( $ )
+{
+	my $string = shift;
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
+}
+
+# Creates an APIServer hold command for a specific item.
+# param:  $userId string - Id of the DISCARD card. 
+# param:  $barCode string - item barcode. 
+# param:  $copyNumber string - copy number of the item to hold.
+# param:  $callNumber string - item's call number. 
+# param:  $sequenceNumber string - sequence number of the transaction.
+# param:  $holdPickupLibrary - the name of the library where the item is sent to fulfil the hold.
+# return: string of api command.
+sub createCopyLevelHold( $$$$$$ )
+{
+	my ( $userId, $barCode, $copyNumber, $callNumber, $sequenceNumber, $holdPickupLibrary ) = @_;
+	# looks like: 
+	# E201210121434290943R ^S32JZFFADMIN^FEEPLMNA^FcNONE^FWADMIN^UO21221015766709^Uk^NQ31221040008513^IQILS Test Call Number^IS3^DHNO^HB10/12/2013^HEGROUP^HFN^HKCOPY^HOEPLMNA^dC3^Fv3000000^^O
+	#                      ^S42JZFFADMIN^FEEPLMNA^FcNONE^FWADMIN^UODISCARD-BTGFTG^Uk^NQ31221079059551^IQ9^IS10^DHNO^HBNEVER^HEGROUP^HFN^HKCOPY^HOEPLMNA^dC3^Fv3000000^^O
+	#
+	#
+	# except that we need a copy level hold to be placed first on the hold queue which looks like:
+	# E201402191335450010R ^S70JZFFADMIN^FEEPLMNA^FcNONE^FWADMIN^UO21221012345678^Uk^NQ31221108123196^IQEasy readers P PBK^IS1^DHNO^HB2/19/2015^HEGROUP^HFY^HGPlace first on queue.^HKCOPY^HOEPLMNA^dC3^4MN^Fv3000000^^O
+	my $transactionRequestLine = '^S';
+	$transactionRequestLine .= $sequenceNumber = '0' x ( 2 - length( $sequenceNumber ) ) . $sequenceNumber;
+	$transactionRequestLine .= 'JZFFADMIN';
+	$transactionRequestLine .= '^FEEPLMNA';
+	$transactionRequestLine .= '^FcNONE';
+	$transactionRequestLine .= '^FWADMIN';
+	$transactionRequestLine .= '^UO'.$userId;
+	$transactionRequestLine .= '^Uk';  # user alternative ID
+	$transactionRequestLine .= '^NQ'.$barCode;
+	$transactionRequestLine .= '^IQ'.$callNumber;
+	$transactionRequestLine .= '^IS'.$copyNumber;
+	$transactionRequestLine .= '^DHNO';
+	$transactionRequestLine .= '^HBNEVER'; #.$holdExpiryDate;
+	$transactionRequestLine .= '^HEGROUP';
+	$transactionRequestLine .= '^HFY';     # Makes it first on the hold queue. HF - Hold position. 'HFN' put on bottom of queue.
+	if ( $opt{'t'} )
+	{
+		$transactionRequestLine .= '^HKTITLE';
+	}
+	else
+	{
+		$transactionRequestLine .= '^HKCOPY';
+	}
+	$transactionRequestLine .= '^HO'.$holdPickupLibrary; # Hold pickup library.
+	$transactionRequestLine .= '^dC3'; # workflows.
+	$transactionRequestLine .= '^OM';  # master override (and why not?)
+	$transactionRequestLine .= '^Fv3000000';
+	$transactionRequestLine .= '^^O';
+	return "$transactionRequestLine\n";
 }
 
 init();
+# Clean the list of items on input.
+open HOLDKEYS, ">$TMP"  or die "**Error: unable to open tmp file '$TMP', $!\n";
+while (<>) 
+{
+	# Item barcodes coming in, ignore lines that aren't real barcodes.
+	if ( ! m/^\d{14,}/ )
+	{
+		print STDERR "*Warning: ignoring invalid item '$_'.\n";
+		next;
+	}
+	else
+	{
+		my $barcode = $_;
+		$barcode =~ s/\s{1,}.+//;
+		print HOLDKEYS "$barcode\n";
+	}
+}
+close HOLDKEYS;
 
+my $results = `cat $TMP | selitem -iB -oIB | selcatalog -iC -oCSt | selcallnum -iN -oNSD 2>/dev/null`;
+my @records = split( '\n', $results );
+my $transactionSequenceNumber = 0;
+my $count                     = 0;
+my $pickupLocation            = $PICKUP_LOCATION;
+if ( $opt{'l'} )
+{
+	$pickupLocation = $opt{'l'};
+}
+open( API_SERVER_TRANSACTION_FILE, ">$HOLD_TRX" ) or die "Couldn't write to '$HOLD_TRX' $!\n";
+foreach my $record ( @records )
+{
+	# print "$record\n";
+	# Item key     | barcode        |Author Title                                             |Callnum|
+	# 790890|12|121|31221091962790  |Snow White and the seven dwarfs [videorecording]|DVD J 398.22 SNO| 
+	my ( $catKey, $callSeq, $copyNumber, $barcode, $titleAuthor, $callNumber ) = split( '\|', $record );
+	$transactionSequenceNumber = 1 if ( $transactionSequenceNumber++ >= 99 );
+	print API_SERVER_TRANSACTION_FILE createCopyLevelHold( $SYSTEM_CARD, $barcode, $copyNumber, $callNumber, $transactionSequenceNumber, $pickupLocation );
+	$count++;
+	$barcode = trim( $barcode );
+}
+close( API_SERVER_TRANSACTION_FILE );
+
+# Remove the cleaned barcode list.
+unlink $TMP;
+# Place holds for all items in list.
+if ( $opt{'U'} )
+{
+	`apiserver -h <$HOLD_TRX >$HOLD_RSP` if ( -s $HOLD_TRX );
+}
 # EOF

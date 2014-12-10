@@ -1,7 +1,6 @@
 ####################################################
 # Makefile for project createholds 
 # Created: Wed Dec 10 11:11:17 MST 2014
-#
 #<one line to give the program's name and a brief idea of what it does.>
 #    Copyright (C) 2013  Andrew Nisbet
 #
@@ -36,10 +35,10 @@ ARGS=-x
 put: test
 	scp ${LOCAL}${APP} ${USER}@${TEST_SERVER}:${REMOTE}
 	ssh ${USER}@${TEST_SERVER} '${REMOTE}${APP} ${ARGS}'
-get:
-	scp ${USER}@${TEST_SERVER}:${REMOTE}${APP} ${LOCAL}
+
 test:
 	perl -c ${APP}
+	
 production: test
-	scp ${LOCAL}${APP} ${USER}@${PRODUCTION_SERVER}:${REMOTE}
+	scp ${LOCAL}${APP} ${USER}@${PRODUCTION_SERVER}:/s/sirsi/Unicorn/Bincustom
 
