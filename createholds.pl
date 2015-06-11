@@ -26,6 +26,9 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Wed Dec 10 11:11:17 MST 2014
 # Rev: 
+#          0.2 - Removing cleaning of incoming item ids because the test doesn't account
+#                for variation of ids such as on order ids. A hold on an invalid item will
+#                fail in Symphony anyway. 
 #          0.0 - Dev. 
 #
 ####################################################
@@ -50,7 +53,7 @@ my $TMP        = "$WORKING_DIR/create_hold.tmp";
 my $HOLD_TYPE  = qq{C};
 my $PICKUP_LOCATION  = qq{EPLZORDER};
 my $SYSTEM_CARD= "";
-my $VERSION    = qq{0.1};
+my $VERSION    = qq{0.2};
 
 #
 # Message about this program and how to use it.
@@ -167,18 +170,8 @@ init();
 open HOLDKEYS, ">$TMP"  or die "**Error: unable to open tmp file '$TMP', $!\n";
 while (<>) 
 {
-	# Item barcodes coming in, ignore lines that aren't real barcodes.
-	if ( ! m/^\d{14,}/ )
-	{
-		print STDERR "*Warning: ignoring invalid item '$_'.\n";
-		next;
-	}
-	else
-	{
-		my $barcode = $_;
-		$barcode =~ s/\s{1,}.+//;
-		print HOLDKEYS "$barcode\n";
-	}
+	my $barcode = trim ( $_ );
+	print HOLDKEYS "$barcode\n";
 }
 close HOLDKEYS;
 
