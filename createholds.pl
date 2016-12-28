@@ -26,6 +26,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Wed Dec 10 11:11:17 MST 2014
 # Rev: 
+#          0.4 - Make hold expire in a year, Default is to never expire.
 #          0.3 - Make hold first in hold queue.
 #          0.2 - Removing cleaning of incoming item ids because the test doesn't account
 #                for variation of ids such as on order ids. A hold on an invalid item will
@@ -57,7 +58,8 @@ my $SYSTEM_CARD  = "";
 my $HOLDPOSITION = qq{Y};    # By default this script places holds at the top of the queue. This is 
                              # done because it is used by automation to ensure that holds for system 
 							 # cards get processed before customer holds. Think about av incomplete.
-my $VERSION      = qq{0.3};
+my $VERSION      = qq{0.4};
+chomp( my $EXPIRE= `date +%m/%d/%Y` ); # 12/28/2016 for example or '^HB12/13/2017' as a transaction.
 
 #
 # Message about this program and how to use it.
@@ -66,14 +68,16 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-qtUx] -B<barcode> [-l <library_code>]
+	usage: $0 [-eqtUx] -B<barcode> [-l <library_code>]
 Creates holds for a user. The script expects a list of items on stdin
 which must have the barcode of the item; one per line.
 
 Use the '-B' switch will determine which user account is 
-to be affected.
+to be affected. Holds never expire by default but can be made to expire
+in 1 year if the '-e' flag is used.
 
  -B: REQUIRED User ID.
+ -e: Make hold expire in a year, Default is to never expire.
  -l: Sets the hold pickup location. Default $PICKUP_LOCATION.
  -q: Please hold normally, that is, hold goes on the end of the queue. 
      The default is to create hold as position #1 on queue because 
@@ -87,6 +91,8 @@ example:
  cat item_ids.lst | $0 -B 21221012345678 -U
  cat item_ids.lst | $0 -B 21221012345678 -tU
  echo 31221102353351 | $0 -B 21221012345678 -tUq
+Create a hold for a user with a one year expiry.
+ echo 31221102353351 | $0 -B 21221012345678 -tUqe
  cat item_ids.lst | $0
  
 Version: $VERSION
@@ -99,7 +105,7 @@ EOF
 # return: 
 sub init
 {
-    my $opt_string = 'B:l:qtUx';
+    my $opt_string = 'B:el:qtUx';
     getopts( "$opt_string", \%opt ) or usage();
     usage() if ( $opt{'x'} );
     if ( $opt{'B'} )
@@ -143,6 +149,8 @@ sub createHold( $$$$$$ )
 	#
 	# except that we need a copy level hold to be placed first on the hold queue which looks like:
 	# E201402191335450010R ^S70JZFFADMIN^FEEPLMNA^FcNONE^FWADMIN^UO21221012345678^Uk^NQ31221108123196^IQEasy readers P PBK^IS1^DHNO^HB2/19/2015^HEGROUP^HFY^HGPlace first on queue.^HKCOPY^HOEPLMNA^dC3^4MN^Fv3000000^^O
+	# And expiry looks like this:
+	# E201612131942521754R ^S01JZFFBIBLIOCOMM^FcNONE^FEEPLMNA^UO21221019003992^Uf6071^NQ31221114974079^HB12/13/2017^HKTITLE^HOEPLMNA^^O00108
 	my $transactionRequestLine = '^S';
 	$transactionRequestLine .= $sequenceNumber = '0' x ( 2 - length( $sequenceNumber ) ) . $sequenceNumber;
 	$transactionRequestLine .= 'JZFFADMIN';
@@ -155,7 +163,14 @@ sub createHold( $$$$$$ )
 	$transactionRequestLine .= '^IQ'.$callNumber;
 	$transactionRequestLine .= '^IS'.$copyNumber;
 	$transactionRequestLine .= '^DHNO';
-	$transactionRequestLine .= '^HBNEVER'; #.$holdExpiryDate;
+	if ( $opt{'e'} )
+	{
+		$transactionRequestLine .= "^HB$EXPIRE"; # 1 year from the date the script is run.
+	}
+	else
+	{
+		$transactionRequestLine .= '^HBNEVER'; # default to never expire.
+	}
 	$transactionRequestLine .= '^HEGROUP';
 	$transactionRequestLine .= '^HF'.$HOLDPOSITION; # HF - Hold position. 'HFN' put on bottom of queue with '-q', 'HFY' at top default.
 	$transactionRequestLine .= '^HK'.$HOLD_TYPE;    # Copy (by default) or title level hold with 't'.
