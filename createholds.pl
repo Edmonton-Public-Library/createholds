@@ -68,7 +68,7 @@ sub usage()
 {
     print STDERR << "EOF";
 
-	usage: $0 [-eqtUx] -B<barcode> [-l <library_code>]
+	usage: [echo <item_id>|cat <item_ids>] | $0 [-eqtUx] -B<barcode> [-l <library_code>]
 Creates holds for a user. The script expects a list of items on stdin
 which must have the barcode of the item; one per line.
 
