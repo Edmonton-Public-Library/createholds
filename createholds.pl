@@ -26,6 +26,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Wed Dec 10 11:11:17 MST 2014
 # Rev: 
+#          0.5 - Fix hold expire which was set to today's date, not a year from now1.
 #          0.4 - Make hold expire in a year, Default is to never expire.
 #          0.3 - Make hold first in hold queue.
 #          0.2 - Removing cleaning of incoming item ids because the test doesn't account
@@ -58,8 +59,8 @@ my $SYSTEM_CARD  = "";
 my $HOLDPOSITION = qq{Y};    # By default this script places holds at the top of the queue. This is 
                              # done because it is used by automation to ensure that holds for system 
 							 # cards get processed before customer holds. Think about av incomplete.
-my $VERSION      = qq{0.4};
-chomp( my $EXPIRE= `date +%m/%d/%Y` ); # 12/28/2016 for example or '^HB12/13/2017' as a transaction.
+my $VERSION      = qq{0.5};
+chomp( my $EXPIRE= `transdate -d+365` ); # if today is 12/28/2016 expire '^HB12/28/2017' as a transaction.
 
 #
 # Message about this program and how to use it.
