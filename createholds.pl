@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-####################################################
+#############################################################################################
 #
 # Perl source file for project createholds 
 # Purpose:
@@ -26,6 +26,7 @@
 # Author:  Andrew Nisbet, Edmonton Public Library
 # Created: Wed Dec 10 11:11:17 MST 2014
 # Rev: 
+#          0.6 - Fix hold date format bug.
 #          0.5 - Fix hold expire which was set to today's date, not a year from now1.
 #          0.4 - Make hold expire in a year, Default is to never expire.
 #          0.3 - Make hold first in hold queue.
@@ -34,7 +35,7 @@
 #                fail in Symphony anyway. 
 #          0.0 - Dev. 
 #
-####################################################
+###########################################################################################
 
 use strict;
 use warnings;
@@ -59,8 +60,9 @@ my $SYSTEM_CARD  = "";
 my $HOLDPOSITION = qq{Y};    # By default this script places holds at the top of the queue. This is 
                              # done because it is used by automation to ensure that holds for system 
 							 # cards get processed before customer holds. Think about av incomplete.
-my $VERSION      = qq{0.5};
-chomp( my $EXPIRE= `transdate -d+365` ); # if today is 12/28/2016 expire '^HB12/28/2017' as a transaction.
+my $VERSION      = qq{0.6};
+# if today is 12/28/2016 expire '^HB12/28/2017' as a transaction.
+chomp( my $EXPIRE = `transdate -d+365 | pipe.pl -mc0:####=##=## | pipe.pl -W'=' -oc1,c2,c0 -h'/'` ); 
 
 #
 # Message about this program and how to use it.
